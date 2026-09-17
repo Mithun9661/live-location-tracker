@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Share location · LiveTrack</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <main class="share-layout">
+    <section class="share-card">
+      <div class="brand"><span class="brand-mark">⌖</span><span>LiveTrack</span></div>
+      <h1>Share your live location</h1>
+      <p class="muted">Your browser will ask for location permission. Updates are shared only while this page is open and you can stop at any time.</p>
+      <div class="notice">Only continue if you know and trust the person who sent this link. This session expires within 24 hours.</div>
+      <div id="status" class="status">Location sharing is off.</div>
+      <button id="start" class="btn btn-success full">Start sharing</button>
+      <button id="stop" class="btn btn-danger full hidden">Stop sharing</button>
+    </section>
+  </main>
+  <script>
+    const code = location.pathname.split("/").pop()
+    const status = document.querySelector("#status")
+    const start = document.querySelector("#start")
+    const stop = document.querySelector("#stop")
+    let watchId = null
+
+    async function send(position) {
+      const response = await fetch(`/api/share/${code}/location`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy}) })
+      if (!response.ok) { stopSharing(); status.textContent = "This sharing session has ended or expired."; return }
+      status.textContent = `Sharing securely · accuracy about ${Math.round(position.coords.accuracy)} m · ${new Date().toLocaleTimeString()}`
+    }
+    function startSharing() {
+      if (!navigator.geolocation) { status.textContent = "Geolocation is not supported by this browser."; return }
+      status.textContent = "Requesting permission…"
+      watchId = navigator.geolocation.watchPosition(send, error => {
+        status.textContent = error.code === 1 ? "Permission denied. Location was not shared." : "Unable to get your location. Check GPS and try again."
+        stopSharing()
+      }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 })
+      start.classList.add("hidden"); stop.classList.remove("hidden")
+    }
+    function stopSharing() {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+      watchId = null; start.classList.remove("hidden"); stop.classList.add("hidden")
+      if (!status.textContent.includes("ended") && !status.textContent.includes("denied") && !status.textContent.includes("Unable")) status.textContent = "Location sharing is off."
+    }
+    start.addEventListener("click", startSharing); stop.addEventListener("click", stopSharing); window.addEventListener("beforeunload", stopSharing)
+  </script>
+</body>
+</html>
