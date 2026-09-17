@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Live map · LiveTrack</title>
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+  <main class="map-shell">
+    <header class="map-header"><div><div id="name" class="map-title">Live location</div><div id="status" class="session-meta">Connecting…</div></div><a class="btn" href="/">← Dashboard</a></header>
+    <div id="map"></div>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const id = location.pathname.split("/").pop()
+    const name = document.querySelector("#name")
+    const status = document.querySelector("#status")
+    const map = L.map("map").setView([20.5937, 78.9629], 5)
+    let marker = null, accuracyCircle = null
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map)
+
+    function update(locationData) {
+      if (!locationData) { status.textContent = "Waiting for the person to start sharing…"; return }
+      const point = [locationData.lat, locationData.lng]
+      if (!marker) marker = L.marker(point).addTo(map); else marker.setLatLng(point)
+      if (locationData.accuracy) {
+        if (!accuracyCircle) accuracyCircle = L.circle(point, {radius: locationData.accuracy, weight: 1, fillOpacity: .08}).addTo(map)
+        else accuracyCircle.setLatLng(point).setRadius(locationData.accuracy)
+      }
+      map.setView(point, Math.max(map.getZoom(), 16))
+      status.textContent = `Updated ${new Date(locationData.updatedAt).toLocaleTimeString()}${locationData.accuracy ? ` · ±${Math.round(locationData.accuracy)} m` : ""}`
+    }
+    fetch(`/api/sessions/${id}`).then(response => response.ok ? response.json() : Promise.reject()).then(session => { name.textContent = session.name; update(session.location) }).catch(() => { status.textContent = "Session not found or expired." })
+    const socket = io()
+    socket.on("connect", () => socket.emit("session:watch", id))
+    socket.on("location:update", update)
+    socket.on("session:ended", () => { status.textContent = "This session has ended." })
+  </script>
+</body>
+</html>
