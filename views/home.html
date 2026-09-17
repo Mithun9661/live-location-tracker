@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard · LiveTrack</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">⌖</span><span>LiveTrack</span></a>
+      <form action="/logout" method="post"><button class="btn" type="submit">Log out</button></form>
+    </header>
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow">Private · Real time · Consent first</span>
+          <h1>Share a location when it matters.</h1>
+          <p class="lead">Create a time-limited link, send it to a trusted person, and follow their location only after they explicitly start sharing.</p>
+        </div>
+        <div class="stat-card">
+          <div class="pulse">System online</div>
+          <div id="active-count" class="stat-value">0</div>
+          <div class="muted">active sharing sessions</div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head">
+          <div><h2>Location sessions</h2><p class="muted">Links expire automatically after 24 hours.</p></div>
+          <form id="new-session" class="new-session">
+            <input class="input" name="name" maxlength="50" placeholder="Person or device name" aria-label="Person or device name" required>
+            <button class="btn btn-primary" type="submit">Create secure link</button>
+          </form>
+        </div>
+        <div id="session-list" class="session-list"><div class="empty">Loading sessions…</div></div>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script>
+    const list = document.querySelector("#session-list")
+    const count = document.querySelector("#active-count")
+    const toast = document.querySelector("#toast")
+
+    const escapeHtml = value => String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char])
+    function notify(message) { toast.textContent = message; toast.classList.remove("hidden"); setTimeout(() => toast.classList.add("hidden"), 2600) }
+    function relativeTime(value) {
+      if (!value) return "Waiting for first location"
+      const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000))
+      return seconds < 60 ? `Updated ${seconds}s ago` : `Updated ${Math.floor(seconds / 60)}m ago`
+    }
+    async function loadSessions() {
+      const response = await fetch("/api/sessions")
+      if (response.status === 401 || response.redirected) return location.assign("/login")
+      const sessions = await response.json()
+      count.textContent = sessions.filter(item => item.location).length
+      if (!sessions.length) { list.innerHTML = '<div class="empty">No sessions yet. Create your first secure sharing link.</div>'; return }
+      list.innerHTML = sessions.map(item => `
+        <article class="session">
+          <div><div class="session-title">${escapeHtml(item.name)}</div><div class="session-meta">${relativeTime(item.location?.updatedAt)} · Expires ${new Date(item.expiresAt).toLocaleString()}</div></div>
+          <div class="session-actions">
+            <button class="btn" data-copy="${location.origin}/share/${item.code}">Copy link</button>
+            <a class="btn btn-primary" href="/map/${item.id}">Open map</a>
+            <button class="btn btn-danger" data-delete="${item.id}">End</button>
+          </div>
+        </article>`).join("")
+    }
+    document.querySelector("#new-session").addEventListener("submit", async event => {
+      event.preventDefault()
+      const form = event.currentTarget
+      const response = await fetch("/api/sessions", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({name: new FormData(form).get("name")}) })
+      const session = await response.json()
+      form.reset(); await loadSessions(); await navigator.clipboard.writeText(session.shareUrl); notify("Secure link created and copied")
+    })
+    list.addEventListener("click", async event => {
+      const copy = event.target.closest("[data-copy]")
+      const remove = event.target.closest("[data-delete]")
+      if (copy) { await navigator.clipboard.writeText(copy.dataset.copy); notify("Sharing link copied") }
+      if (remove && confirm("End this sharing session?")) { await fetch(`/api/sessions/${remove.dataset.delete}`, {method:"DELETE"}); loadSessions() }
+    })
+    loadSessions(); setInterval(loadSessions, 10000)
+  </script>
+</body>
+</html>
