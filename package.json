@@ -1,0 +1,18 @@
+{
+  "name": "live-location-tracker",
+  "version": "1.0.0",
+  "description": "Consent-based real-time location sharing with an admin dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "author": "Mithun Kumar",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.1",
+    "socket.io": "^4.8.1"
+  }
+}
