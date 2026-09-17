@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in · LiveTrack</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <main class="auth-layout">
+    <form class="auth-card" action="/login" method="post">
+      <div class="brand"><span class="brand-mark">⌖</span><span>LiveTrack</span></div>
+      <h1>Welcome back</h1>
+      <p class="muted">Sign in to create and manage consent-based location-sharing sessions.</p>
+      <p id="error" class="error hidden" role="alert"></p>
+      <div class="field"><label for="username">Username</label><input class="input" id="username" name="username" autocomplete="username" required></div>
+      <div class="field"><label for="password">Password</label><input class="input" id="password" name="password" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn-primary full" type="submit">Sign in securely</button>
+    </form>
+  </main>
+  <script>
+    const error = new URLSearchParams(location.search).get("error")
+    if (error) {
+      const box = document.querySelector("#error")
+      box.textContent = error === "locked" ? "Too many attempts. Try again in 15 minutes." : "Incorrect username or password."
+      box.classList.remove("hidden")
+    }
+  </script>
+</body>
+</html>
